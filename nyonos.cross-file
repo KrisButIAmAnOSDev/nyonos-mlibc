@@ -1,0 +1,18 @@
+[binaries]
+c = '/home/quan/kawkaw/nyonos-toolchain/toolchain16/bin/x86_64-nyonos-gcc'
+cpp = '/home/quan/kawkaw/nyonos-toolchain/toolchain16/bin/x86_64-nyonos-g++'
+ar = '/home/quan/kawkaw/nyonos-toolchain/toolchain/usr/bin/x86_64-nyonos-ar'
+strip = '/home/quan/kawkaw/nyonos-toolchain/toolchain/usr/bin/x86_64-nyonos-strip'
+ld = '/home/quan/kawkaw/nyonos-toolchain/toolchain/usr/bin/x86_64-nyonos-ld'
+nm = '/home/quan/kawkaw/nyonos-toolchain/toolchain/usr/bin/x86_64-nyonos-nm'
+objcopy = '/home/quan/kawkaw/nyonos-toolchain/toolchain/usr/bin/x86_64-nyonos-objcopy'
+
+[built-in options]
+c_args = ['--sysroot=/home/quan/kawkaw/nyonos-toolchain/sysroot']
+cpp_args = ['--sysroot=/home/quan/kawkaw/nyonos-toolchain/sysroot']
+
+[host_machine]
+system = 'nyonos'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

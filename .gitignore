@@ -1,0 +1,10 @@
+/build
+/headers-build
+/vbuild
+*.o
+*.a
+*.xbstrap
+# editor configs:
+.vscode
+compile_commands.json
+/linux-headers

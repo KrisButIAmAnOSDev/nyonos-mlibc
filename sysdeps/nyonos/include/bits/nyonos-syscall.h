@@ -1,0 +1,29 @@
+#ifndef _MLIBC_NYONOS_SYSCALL_NR_H
+#define _MLIBC_NYONOS_SYSCALL_NR_H
+
+#define SYS_READ 1
+#define SYS_WRITE 2
+#define SYS_PREAD 3
+#define SYS_OPEN 4
+#define SYS_CLOSE 5
+#define SYS_LSEEK 6
+#define SYS_FSTAT 8
+#define SYS_GETDENTS 9
+#define SYS_ISATTY 10
+#define SYS_STAT 11
+#define SYS_EXIT 16
+#define SYS_GETPID 17
+#define SYS_SLEEP 18
+#define SYS_MMAP 19
+#define SYS_MUNMAP 20
+#define SYS_CLOCK_GETTIME 21
+#define SYS_FUTEX 22
+#define SYS_SET_FS_BASE 23
+
+#define ABI_MMAP_PROT_NONE 0
+#define ABI_MMAP_PROT_READ 1
+#define ABI_MMAP_PROT_WRITE 2
+#define ABI_MMAP_PROT_EXEC 4
+#define ABI_MMAP_ANON 0x20
+
+#endif

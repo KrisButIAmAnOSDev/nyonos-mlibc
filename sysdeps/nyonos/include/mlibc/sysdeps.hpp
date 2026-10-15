@@ -7,23 +7,34 @@ namespace mlibc {
 struct NyonosSysdepTags :
 	AnonAllocate,
 	AnonFree,
+	Clone,
 	ClockGet,
 	Close,
+	Dup,
+	GetTid,
 	Exit,
+	Fcntl,
 	FutexWait,
 	FutexWake,
+	GetPid,
+	Ioctl,
 	Isatty,
 	LibcLog,
 	LibcPanic,
 	Open,
+	OpenDir,
+	PrepareStack,
 	Pread,
 	Read,
+	ReadEntries,
 	Seek,
 	Stat,
+	ThreadExit,
 	TcbSet,
 	VmMap,
 	VmUnmap,
-	Write
+	Write,
+	Yield
 {};
 
 template<typename Tag>

@@ -8,9 +8,12 @@
 #define SYS_CLOSE 5
 #define SYS_LSEEK 6
 #define SYS_FSTAT 8
-#define SYS_GETDENTS 9
 #define SYS_ISATTY 10
 #define SYS_STAT 11
+#define SYS_DUP 7
+#define SYS_GETDENTS 9
+#define SYS_FCNTL 13
+#define SYS_IOCTL 14
 #define SYS_EXIT 16
 #define SYS_GETPID 17
 #define SYS_SLEEP 18
@@ -19,6 +22,8 @@
 #define SYS_CLOCK_GETTIME 21
 #define SYS_FUTEX 22
 #define SYS_SET_FS_BASE 23
+#define SYS_NEWTHREAD 25
+#define SYS_THREAD_EXIT 26
 
 #define ABI_MMAP_PROT_NONE 0
 #define ABI_MMAP_PROT_READ 1

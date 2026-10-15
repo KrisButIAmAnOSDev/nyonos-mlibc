@@ -64,6 +64,8 @@ endif
 rtld_sources += files(
 	'sysdeps.cpp',
 	'syscall.cpp',
+	'threading/x86_64-thread.cpp',
+	'threading/x86_64-thread-entry.S',
 )
 rtld_include_dirs += include_directories('include')
 
@@ -71,6 +73,8 @@ libc_sources += files(
 	'entry.cpp',
 	'sysdeps.cpp',
 	'syscall.cpp',
+	'threading/x86_64-thread.cpp',
+	'threading/x86_64-thread-entry.S',
 )
 libc_include_dirs += include_directories('include')
 

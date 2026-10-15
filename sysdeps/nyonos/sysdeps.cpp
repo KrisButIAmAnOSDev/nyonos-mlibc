@@ -5,6 +5,11 @@
 
 #include <abi-bits/errno.h>
 #include <abi-bits/mode_t.h>
+#include <abi-bits/fcntl.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stddef.h>
 #include <sys/stat.h>
 #include <mlibc/tcb.hpp>
 
@@ -12,6 +17,14 @@
 #include <string.h>
 
 namespace mlibc {
+
+struct NyonosDirent {
+	uint64_t size;
+	uint32_t cluster;
+	uint32_t attr;
+	uint32_t is_dir;
+	char name[32];
+};
 
 static int sc_error(long ret) {
 	if (ret < 0 && ret >= -4095)
@@ -96,13 +109,135 @@ int Sysdeps<TcbSet>::operator()(void *pointer) {
 
 int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct timespec *time) {
 	auto ret = syscall(SYS_FUTEX, reinterpret_cast<__sc_word_t>(pointer), 0u,
-			static_cast<__sc_word_t>(expected));
+			static_cast<__sc_word_t>(expected), reinterpret_cast<__sc_word_t>(time));
 	return sc_error(ret);
 }
 
+void Sysdeps<Yield>::operator()() {
+}
+
 int Sysdeps<FutexWake>::operator()(int *pointer, bool all) {
-	auto ret = syscall(SYS_FUTEX, reinterpret_cast<__sc_word_t>(pointer), 1u, 0);
+	auto ret = syscall(SYS_FUTEX, reinterpret_cast<__sc_word_t>(pointer), 1u, 0, 0);
 	return sc_error(ret);
+}
+
+pid_t Sysdeps<GetPid>::operator()() {
+	auto ret = syscall(SYS_GETPID);
+	if (sc_error(ret))
+		return ret;
+	return static_cast<pid_t>(ret);
+}
+
+int Sysdeps<Dup>::operator()(int fd, int flags, int *newfd) {
+	auto ret = syscall(SYS_DUP, fd, flags, 0);
+	if (int e = sc_error(ret))
+		return e;
+	*newfd = static_cast<int>(ret);
+	return 0;
+}
+
+int Sysdeps<Fcntl>::operator()(int fd, int request, va_list args, int *result) {
+	intptr_t arg;
+	switch (request) {
+	case F_DUPFD:
+	case F_SETFD:
+		arg = static_cast<intptr_t>(va_arg(args, int));
+		break;
+	case F_GETFD:
+	case F_GETFL:
+		arg = 0;
+		break;
+	default:
+		arg = reinterpret_cast<intptr_t>(va_arg(args, void *));
+		break;
+	}
+
+	auto ret = syscall(SYS_FCNTL, fd, request, static_cast<__sc_word_t>(arg));
+	if (int e = sc_error(ret))
+		return e;
+	*result = static_cast<int>(ret);
+	return 0;
+}
+
+int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *result) {
+	auto ret = syscall(SYS_IOCTL, fd, request, reinterpret_cast<__sc_word_t>(arg));
+	if (int e = sc_error(ret))
+		return e;
+	*result = static_cast<int>(ret);
+	return 0;
+}
+
+static const int dir_slots = 16;
+static int dir_handle[dir_slots];
+static unsigned dir_index[dir_slots];
+
+static unsigned dir_seek(int handle) {
+	for (int i = 0; i < dir_slots; i++)
+		if (dir_handle[i] == handle)
+			return dir_index[i];
+	return 0;
+}
+
+static void dir_place(int handle, unsigned index) {
+	for (int i = 0; i < dir_slots; i++) {
+		if (dir_handle[i] == handle || dir_handle[i] == 0) {
+			dir_handle[i] = handle;
+			dir_index[i] = index;
+			return;
+		}
+	}
+}
+
+int Sysdeps<OpenDir>::operator()(const char *path, int *handle) {
+	auto ret = syscall(SYS_OPEN, reinterpret_cast<__sc_word_t>(path), O_RDONLY | O_DIRECTORY);
+	if (int e = sc_error(ret))
+		return e;
+	*handle = static_cast<int>(ret);
+	dir_place(*handle, 0);
+	return 0;
+}
+
+int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, size_t *bytes_read) {
+	struct NyonosDirent dent;
+	auto out = reinterpret_cast<char *>(buffer);
+	size_t total = 0;
+	unsigned index = dir_seek(handle);
+
+	for (;;) {
+		auto ret = syscall(SYS_GETDENTS, handle, index, reinterpret_cast<__sc_word_t>(&dent));
+		if (ret <= 0) {
+			if (int e = sc_error(ret))
+				return e;
+			break;
+		}
+
+		size_t namelen = 0;
+		while (namelen < sizeof(dent.name) && dent.name[namelen])
+			namelen++;
+		if (namelen == 0)
+			break;
+
+		size_t reclen = offsetof(struct dirent, d_name) + namelen + 1;
+		reclen = (reclen + 7) & ~static_cast<size_t>(7);
+		if (total + reclen > max_size)
+			break;
+
+		struct dirent *d = reinterpret_cast<struct dirent *>(out + total);
+		memset(d, 0, reclen);
+		d->d_ino = dent.cluster;
+		d->d_off = index + 1;
+		d->d_reclen = reclen;
+		d->d_type = dent.is_dir ? 4 : 8;
+		for (size_t i = 0; i < namelen; i++)
+			d->d_name[i] = dent.name[i];
+
+		total += reclen;
+		index++;
+	}
+
+	dir_place(handle, index);
+	*bytes_read = total;
+	return 0;
 }
 
 int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int *fd) {

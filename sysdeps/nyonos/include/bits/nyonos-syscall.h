@@ -22,8 +22,17 @@
 #define SYS_CLOCK_GETTIME 21
 #define SYS_FUTEX 22
 #define SYS_SET_FS_BASE 23
+#define SYS_DUP2 12
 #define SYS_NEWTHREAD 25
 #define SYS_THREAD_EXIT 26
+#define SYS_FORK 27
+#define SYS_VFORK 28
+#define SYS_CLONE 29
+#define SYS_WAITPID 30
+#define SYS_YIELD 24
+
+#define ABI_WNOHANG 1
+#define ABI_AT_FDCWD -100
 
 #define ABI_MMAP_PROT_NONE 0
 #define ABI_MMAP_PROT_READ 1

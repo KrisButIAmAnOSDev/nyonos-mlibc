@@ -114,6 +114,7 @@ int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct time
 }
 
 void Sysdeps<Yield>::operator()() {
+	syscall(SYS_YIELD, 0);
 }
 
 int Sysdeps<FutexWake>::operator()(int *pointer, bool all) {
@@ -324,6 +325,72 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 		return e;
 
 	fill_linux_stat(statbuf, &kst);
+	return 0;
+}
+
+int Sysdeps<Fork>::operator()(pid_t *child) {
+	auto ret = syscall(SYS_FORK, reinterpret_cast<__sc_word_t>(child));
+	return sc_error(ret);
+}
+
+int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusage *ru,
+		pid_t *ret_pid) {
+	auto ret = syscall(SYS_WAITPID, pid, reinterpret_cast<__sc_word_t>(status), flags);
+	if (int e = sc_error(ret))
+		return e;
+	if (ret_pid)
+		*ret_pid = static_cast<pid_t>(ret);
+	return 0;
+}
+
+int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos) {
+	if (!secs)
+		return EINVAL;
+
+	long rem_nanos = nanos ? *nanos : 0;
+	if (rem_nanos < 0 || rem_nanos >= 1000000000L)
+		return EINVAL;
+
+	if (*secs < 0) {
+		*secs = 0;
+		if (nanos)
+			*nanos = 0;
+		return 0;
+	}
+
+	long long total_nanos = static_cast<long long>(*secs) * 1000000000LL + rem_nanos;
+	long ms = static_cast<long>((total_nanos + 999999LL) / 1000000LL);
+
+	if (ms > 60000L)
+		ms = 60000L;
+
+	syscall(SYS_SLEEP, ms);
+
+	long long slept_nanos = static_cast<long long>(ms) * 1000000LL;
+	if (slept_nanos > total_nanos)
+		slept_nanos = total_nanos;
+
+	long long left = total_nanos - slept_nanos;
+	*secs = static_cast<time_t>(left / 1000000000LL);
+	if (nanos)
+		*nanos = static_cast<long>(left % 1000000000LL);
+	return 0;
+}
+
+int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
+	auto ret = syscall(SYS_DUP2, fd, newfd, flags);
+	return sc_error(ret);
+}
+
+int Sysdeps<Openat>::operator()(int dirfd, const char *path, int flags, mode_t mode,
+		int *fd) {
+	if (dirfd != ABI_AT_FDCWD)
+		return ENOSYS;
+
+	auto ret = syscall(SYS_OPEN, reinterpret_cast<__sc_word_t>(path), flags);
+	if (int e = sc_error(ret))
+		return e;
+	*fd = static_cast<int>(ret);
 	return 0;
 }
 

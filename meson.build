@@ -321,6 +321,8 @@ elif host_machine.system() == 'ethereal'
 	internal_conf.set10('MLIBC_MAP_FILE_WINDOWS', true)
 	subdir('sysdeps/ethereal')
 # ANCHOR: demo-sysdeps
+elif host_machine.system() == 'nyonos'
+	subdir('sysdeps/nyonos')
 elif host_machine.system() == 'demo'
 	subdir('sysdeps/demo')
 # ANCHOR_END: demo-sysdeps

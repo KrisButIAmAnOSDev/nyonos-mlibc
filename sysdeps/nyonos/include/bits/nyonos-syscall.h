@@ -1,0 +1,59 @@
+#ifndef _MLIBC_NYONOS_SYSCALL_NR_H
+#define _MLIBC_NYONOS_SYSCALL_NR_H
+
+#define SYS_READ 1
+#define SYS_WRITE 2
+#define SYS_PREAD 3
+#define SYS_OPEN 4
+#define SYS_CLOSE 5
+#define SYS_LSEEK 6
+#define SYS_FSTAT 8
+#define SYS_ISATTY 10
+#define SYS_STAT 11
+#define SYS_DUP 7
+#define SYS_GETDENTS 9
+#define SYS_FCNTL 13
+#define SYS_IOCTL 14
+#define SYS_EXIT 16
+#define SYS_GETPID 17
+#define SYS_SLEEP 18
+#define SYS_MMAP 19
+#define SYS_MUNMAP 20
+#define SYS_CLOCK_GETTIME 21
+#define SYS_FUTEX 22
+#define SYS_SET_FS_BASE 23
+#define SYS_DUP2 12
+#define SYS_NEWTHREAD 25
+#define SYS_THREAD_EXIT 26
+#define SYS_FORK 27
+#define SYS_VFORK 28
+#define SYS_CLONE 29
+#define SYS_WAITPID 30
+#define SYS_EXECVE 31
+#define SYS_GETPPID 33
+#define SYS_GETUID 34
+#define SYS_GETEUID 35
+#define SYS_GETGID 36
+#define SYS_GETEGID 37
+#define SYS_GETRESUID 38
+#define SYS_GETRESGID 39
+#define SYS_SETHOSTNAME 40
+#define SYS_GETHOSTNAME 41
+#define SYS_POLL 42
+#define SYS_TCGETATTR 43
+#define SYS_TCSETATTR 44
+#define SYS_TCGETWINSIZE 45
+#define SYS_TCSETWINSIZE 46
+#define SYS_TTYNAME 47
+#define SYS_YIELD 24
+
+#define ABI_WNOHANG 1
+#define ABI_AT_FDCWD -100
+
+#define ABI_MMAP_PROT_NONE 0
+#define ABI_MMAP_PROT_READ 1
+#define ABI_MMAP_PROT_WRITE 2
+#define ABI_MMAP_PROT_EXEC 4
+#define ABI_MMAP_ANON 0x20
+
+#endif

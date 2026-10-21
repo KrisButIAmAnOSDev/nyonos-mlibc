@@ -465,7 +465,10 @@ void abstract_file::_ensure_allocation() {
 // --------------------------------------------------------------------------------------
 
 fd_file::fd_file(int fd, void (*do_dispose)(abstract_file *), bool force_unbuffered)
-: abstract_file{do_dispose}, _fd{fd}, _force_unbuffered{force_unbuffered} { }
+: abstract_file{do_dispose}, _fd{fd}, _force_unbuffered{force_unbuffered} {
+	if(force_unbuffered)
+		update_bufmode(buffer_mode::no_buffer);
+}
 
 int fd_file::fd() {
 	return _fd;

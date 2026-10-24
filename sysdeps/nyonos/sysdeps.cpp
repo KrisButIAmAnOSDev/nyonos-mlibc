@@ -504,6 +504,31 @@ int Sysdeps<AnonFree>::operator()(void *pointer, size_t size) {
 	return sc_error(ret);
 }
 
+int Sysdeps<Pipe>::operator()(int *fds, int flags) {
+	(void)flags;
+
+	auto ret = syscall(SYS_PIPE, reinterpret_cast<__sc_word_t>(fds));
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<VmProtect>::operator()(void *pointer, size_t size, int prot) {
+	unsigned kprot = 0;
+	if (prot & PROT_READ)
+		kprot |= ABI_MMAP_PROT_READ;
+	if (prot & PROT_WRITE)
+		kprot |= ABI_MMAP_PROT_WRITE;
+	if (prot & PROT_EXEC)
+		kprot |= ABI_MMAP_PROT_EXEC;
+
+	auto ret = syscall(SYS_MPROTECT, reinterpret_cast<__sc_word_t>(pointer),
+	                    static_cast<__sc_word_t>(size), static_cast<__sc_word_t>(kprot));
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
 int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd,
 		off_t offset, void **window) {
 	unsigned kprot = 0;
@@ -533,6 +558,13 @@ struct NyonosStat {
 	uint32_t attr;
 	uint32_t is_dir;
 	char name[32];
+};
+
+struct NyonosTimespec2 {
+	int64_t asec;
+	int64_t ansec;
+	int64_t msec;
+	int64_t mnsec;
 };
 
 static void fill_linux_stat(struct stat *out, const NyonosStat *in) {
@@ -804,9 +836,87 @@ int Sysdeps<Umask>::operator()(mode_t mode, mode_t *old) {
 	return 0;
 }
 
-void Sysdeps<Sync>::operator()() { }
+void Sysdeps<Sync>::operator()() {
+	syscall(SYS_SYNC);
+}
 
-int Sysdeps<Fdatasync>::operator()(int fd) { (void)fd; return 0; }
+int Sysdeps<Fdatasync>::operator()(int fd) {
+	auto ret = syscall(SYS_FDATASYNC, fd);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Fsync>::operator()(int fd) {
+	auto ret = syscall(SYS_FSYNC, fd);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Utimensat>::operator()(int dirfd, const char *pathname,
+		const struct timespec times[2], int flags) {
+	struct timespec now;
+	NyonosTimespec2 tv;
+
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	if (!times) {
+		tv.asec = now.tv_sec;
+		tv.msec = now.tv_sec;
+	} else {
+		tv.asec = times[0].tv_nsec == UTIME_NOW ? now.tv_sec : times[0].tv_sec;
+		tv.msec = times[1].tv_nsec == UTIME_NOW ? now.tv_sec : times[1].tv_sec;
+	}
+
+	auto ret = syscall(SYS_UTIMENSAT, dirfd, reinterpret_cast<__sc_word_t>(pathname),
+			reinterpret_cast<__sc_word_t>(&tv), flags);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Ftruncate>::operator()(int fd, size_t size) {
+	auto ret = syscall(SYS_FTRUNCATE, fd, size);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Mkdir>::operator()(const char *path, mode_t mode) {
+	auto ret = syscall(SYS_MKDIR, reinterpret_cast<__sc_word_t>(path), mode);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Mkdirat>::operator()(int dirfd, const char *path, mode_t mode) {
+	auto ret = syscall(SYS_MKDIRAT, dirfd, reinterpret_cast<__sc_word_t>(path), mode);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Unlinkat>::operator()(int dirfd, const char *path, int flags) {
+	auto ret = syscall(SYS_UNLINKAT, dirfd, reinterpret_cast<__sc_word_t>(path), flags);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Rmdir>::operator()(const char *path) {
+	auto ret = syscall(SYS_RMDIR, reinterpret_cast<__sc_word_t>(path));
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Truncate>::operator()(const char *path, off_t length) {
+	auto ret = syscall(SYS_TRUNCATE, reinterpret_cast<__sc_word_t>(path), length);
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
 
 int Sysdeps<Flock>::operator()(int fd, int options) { (void)fd; (void)options; return 0; }
 

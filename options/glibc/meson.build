@@ -3,6 +3,7 @@ if not glibc_option
 endif
 libc_sources += files(
 	'generic/dlfcn.cpp',
+	'generic/mntent.cpp',
 	'generic/getopt.cpp',
 	'generic/stdio_ext.cpp',
 	'generic/sys-ioctl.cpp',
@@ -27,6 +28,8 @@ libc_sources += files(
 
 if not no_headers
 	install_headers(
+		'include/malloc.h',
+		'include/mntent.h',
 		'include/getopt.h',
 		'include/stdio_ext.h',
 		'include/err.h',
@@ -51,6 +54,7 @@ if not no_headers
 		'include/sys/reg.h',
 		'include/sys/errno.h',
 		'include/sys/signal.h',
+		'include/sys/sysinfo.h',
 		'include/sys/ucontext.h',
 		'include/sys/personality.h',
 		'include/sys/timeb.h',

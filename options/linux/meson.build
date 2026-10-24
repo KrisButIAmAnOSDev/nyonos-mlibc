@@ -4,7 +4,6 @@ if not linux_option
 endif
 libc_sources += files(
 	'generic/fcntl.cpp',
-	'generic/mntent.cpp',
 	'generic/sys-inotify.cpp',
 	'generic/sys-mount.cpp',
 	'generic/sys-prctl.cpp',
@@ -12,13 +11,13 @@ libc_sources += files(
 	'generic/sys-random.cpp',
 	'generic/sys-sendfile.cpp',
 	'generic/sys-uio.cpp',
+	'generic/sys-sysinfo.cpp',
 	'generic/sys-xattr.cpp',
 	'generic/utmp.cpp',
 	'generic/linux-unistd.cpp',
 	'generic/malloc.cpp',
 	'generic/sys-fsuid.cpp',
 	'generic/ifaddrs.cpp',
-	'generic/sys-sysinfo.cpp',
 	'generic/module.cpp',
 	'generic/sys-klog.cpp',
 	'generic/sched.cpp',
@@ -34,9 +33,7 @@ libc_sources += files(
 if not no_headers
 	install_headers(
 		'include/ifaddrs.h',
-		'include/malloc.h',
 		'include/memory.h',
-		'include/mntent.h',
 		'include/values.h',
 		'include/lastlog.h',
 		'include/module.h',
@@ -71,7 +68,6 @@ if not no_headers
 		'include/sys/sysmacros.h',
 		'include/sys/fsuid.h',
 		'include/sys/vt.h',
-		'include/sys/sysinfo.h',
 		'include/sys/klog.h',
 		'include/sys/xattr.h',
 		'include/sys/quota.h',

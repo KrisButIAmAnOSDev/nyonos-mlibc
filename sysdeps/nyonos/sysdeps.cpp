@@ -600,6 +600,17 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 	return 0;
 }
 
+int Sysdeps<Chdir>::operator()(const char *path) {
+	auto ret = syscall(SYS_CHDIR, reinterpret_cast<__sc_word_t>(path));
+	return sc_error(ret);
+}
+
+int Sysdeps<GetCwd>::operator()(char *buf, size_t size) {
+	auto ret = syscall(SYS_GETCWD, reinterpret_cast<__sc_word_t>(buf),
+	                   static_cast<__sc_word_t>(size));
+	return sc_error(ret);
+}
+
 int Sysdeps<Fork>::operator()(pid_t *child) {
 	auto ret = syscall(SYS_FORK, reinterpret_cast<__sc_word_t>(child));
 	return sc_error(ret);
@@ -824,6 +835,60 @@ int Sysdeps<Sysconf>::operator()(int num, long *ret) {
 		return 0;
 	case _SC_AVPHYS_PAGES:
 		*ret = 16384;
+		return 0;
+	case _SC_PAGESIZE:
+		*ret = 4096;
+		return 0;
+	case _SC_CLK_TCK:
+		*ret = 100;
+		return 0;
+	case _SC_CHILD_MAX:
+		*ret = 256;
+		return 0;
+	case _SC_OPEN_MAX:
+		*ret = 256;
+		return 0;
+	case _SC_STREAM_MAX:
+		*ret = 16;
+		return 0;
+	case _SC_ARG_MAX:
+		*ret = 131072;
+		return 0;
+	case _SC_NGROUPS_MAX:
+		*ret = 1;
+		return 0;
+	case _SC_JOB_CONTROL:
+		*ret = -1;
+		return 0;
+	case _SC_SAVED_IDS:
+	case _SC_VERSION:
+		*ret = 200809;
+		return 0;
+	case _SC_LINE_MAX:
+		*ret = 4096;
+		return 0;
+	case _SC_RE_DUP_MAX:
+		*ret = 32767;
+		return 0;
+	case _SC_LOGIN_NAME_MAX:
+	case _SC_TTY_NAME_MAX:
+		*ret = 32;
+		return 0;
+	case _SC_GETPW_R_SIZE_MAX:
+	case _SC_GETGR_R_SIZE_MAX:
+		*ret = 1024;
+		return 0;
+	case _SC_ATEXIT_MAX:
+		*ret = 32;
+		return 0;
+	case _SC_DELAYTIMER_MAX:
+		*ret = 32;
+		return 0;
+	case _SC_SEM_NSEMS_MAX:
+		*ret = 256;
+		return 0;
+	case _SC_TIMER_MAX:
+		*ret = 64;
 		return 0;
 	default:
 		return EINVAL;

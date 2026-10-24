@@ -58,6 +58,8 @@
 #define SYS_TCSETWINSIZE 46
 #define SYS_TTYNAME 47
 #define SYS_YIELD 24
+#define SYS_GETCWD 60
+#define SYS_CHDIR 61
 
 #define ABI_WNOHANG 1
 #define ABI_AT_FDCWD -100

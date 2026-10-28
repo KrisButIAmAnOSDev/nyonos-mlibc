@@ -60,6 +60,17 @@
 #define SYS_YIELD 24
 #define SYS_GETCWD 60
 #define SYS_CHDIR 61
+#define SYS_KILL 62
+#define SYS_SIGACTION 63
+#define SYS_SIGPROCMASK 64
+#define SYS_SIGRETURN 65
+#define SYS_FSTATAT 68
+#define SYS_READLINK 69
+#define SYS_SYMLINK 70
+#define SYS_LINK 71
+#define SYS_CHMOD 72
+#define SYS_FCHMOD 73
+#define SYS_UTIMES 74
 
 #define ABI_WNOHANG 1
 #define ABI_AT_FDCWD -100

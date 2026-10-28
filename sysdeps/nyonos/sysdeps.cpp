@@ -53,38 +53,103 @@ namespace {
 struct sigaction saved_actions[65];
 sigset_t saved_mask;
 
+struct sys_sigaction_kern {
+    uint64_t handler;
+    uint32_t flags;
+    uint32_t pad;
+    uint64_t restorer;
+    uint64_t mask;
+};
+
 }
 
 int Sysdeps<Sigaction>::operator()(int sig, const struct sigaction *__restrict act,
 		struct sigaction *__restrict old) {
 	if (sig <= 0 || sig >= 65) return EINVAL;
-	if (old) {
-		struct sigaction cur = saved_actions[sig];
-		cur.sa_restorer = nullptr;
-		*old = cur;
+
+	struct sys_sigaction_kern kern = {};
+	if (act) {
+		kern.handler = reinterpret_cast<uint64_t>(act->sa_handler);
+		kern.flags = static_cast<uint32_t>(act->sa_flags);
+		kern.restorer = reinterpret_cast<uint64_t>(act->sa_restorer);
+		kern.mask = act->sa_mask.__sig[0];
 	}
-	if (act) saved_actions[sig] = *act;
+
+	struct sys_sigaction_kern oldkern = {};
+	auto ret = syscall(SYS_SIGACTION, static_cast<__sc_word_t>(sig),
+			act ? reinterpret_cast<__sc_word_t>(&kern) : 0,
+			old ? reinterpret_cast<__sc_word_t>(&oldkern) : 0);
+	if (sc_error(ret))
+		return sc_error(ret);
+
+	if (old) {
+		old->sa_handler = reinterpret_cast<void (*)(int)>(oldkern.handler);
+		old->sa_flags = static_cast<int>(oldkern.flags);
+		old->sa_restorer = reinterpret_cast<void (*)(void)>(oldkern.restorer);
+		memset(&old->sa_mask, 0, sizeof(old->sa_mask));
+		old->sa_mask.__sig[0] = oldkern.mask;
+	}
 	return 0;
 }
 
 int Sysdeps<Sigprocmask>::operator()(int how, const sigset_t *__restrict set,
 		sigset_t *__restrict retrieve) {
-	if (retrieve) *retrieve = saved_mask;
-	if (!set) return 0;
-	switch (how) {
-	case SIG_BLOCK:
-		saved_mask.__sig[0] |= set->__sig[0];
-		break;
-	case SIG_UNBLOCK:
-		saved_mask.__sig[0] &= ~set->__sig[0];
-		break;
-	case SIG_SETMASK:
-		saved_mask.__sig[0] = set->__sig[0];
-		break;
-	default:
-		return EINVAL;
+	uint64_t setw = set ? set->__sig[0] : 0;
+	uint64_t gotw = 0;
+	auto ret = syscall(SYS_SIGPROCMASK, static_cast<__sc_word_t>(how),
+			set ? reinterpret_cast<__sc_word_t>(&setw) : 0,
+			retrieve ? reinterpret_cast<__sc_word_t>(&gotw) : 0);
+	if (sc_error(ret))
+		return sc_error(ret);
+	if (retrieve) {
+		memset(retrieve, 0, sizeof(*retrieve));
+		retrieve->__sig[0] = gotw;
 	}
 	return 0;
+}
+
+int Sysdeps<Kill>::operator()(int pid, int sig) {
+	auto ret = syscall(SYS_KILL, static_cast<__sc_word_t>(pid),
+			static_cast<__sc_word_t>(sig));
+	if (sc_error(ret))
+		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Readlink>::operator()(const char *path, void *buffer, size_t max_size,
+		ssize_t *length) {
+	auto ret = syscall(SYS_READLINK, reinterpret_cast<__sc_word_t>(path),
+			reinterpret_cast<__sc_word_t>(buffer),
+			static_cast<__sc_word_t>(max_size));
+	if (int e = sc_error(ret))
+		return e;
+	if (length)
+		*length = static_cast<ssize_t>(ret);
+	return 0;
+}
+
+int Sysdeps<Symlink>::operator()(const char *target_path, const char *link_path) {
+	auto ret = syscall(SYS_SYMLINK, reinterpret_cast<__sc_word_t>(target_path),
+			reinterpret_cast<__sc_word_t>(link_path));
+	return sc_error(ret);
+}
+
+int Sysdeps<Link>::operator()(const char *old_path, const char *new_path) {
+	auto ret = syscall(SYS_LINK, reinterpret_cast<__sc_word_t>(old_path),
+			reinterpret_cast<__sc_word_t>(new_path));
+	return sc_error(ret);
+}
+
+int Sysdeps<Chmod>::operator()(const char *pathname, mode_t mode) {
+	auto ret = syscall(SYS_CHMOD, reinterpret_cast<__sc_word_t>(pathname),
+			static_cast<__sc_word_t>(mode));
+	return sc_error(ret);
+}
+
+int Sysdeps<Fchmod>::operator()(int fd, mode_t mode) {
+	auto ret = syscall(SYS_FCHMOD, static_cast<__sc_word_t>(fd),
+			static_cast<__sc_word_t>(mode));
+	return sc_error(ret);
 }
 
 int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *const envp[]) {
@@ -572,7 +637,10 @@ static void fill_linux_stat(struct stat *out, const NyonosStat *in) {
 	out->st_dev = 0;
 	out->st_ino = in->cluster;
 	out->st_nlink = 1;
-	out->st_mode = in->is_dir ? S_IFDIR | 0755 : S_IFREG | 0644;
+	mode_t perm = in->is_dir ? 0755 : 0644;
+	if (in->attr & 0x01)
+		perm &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+	out->st_mode = in->is_dir ? S_IFDIR | perm : S_IFREG | perm;
 	out->st_uid = 0;
 	out->st_gid = 0;
 	out->st_rdev = 0;
@@ -591,8 +659,16 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 		struct stat *statbuf) {
 	NyonosStat kst;
 	__sc_word_t paddr = reinterpret_cast<__sc_word_t>(&kst);
-	auto ret = (fd >= 0) ? syscall(SYS_FSTAT, fd, paddr)
-			     : syscall(SYS_STAT, reinterpret_cast<__sc_word_t>(path), paddr);
+	__sc_word_t ret;
+	if (fsfdt == mlibc::fsfd_target::fd_path && path && path[0]) {
+		ret = syscall(SYS_FSTATAT, static_cast<__sc_word_t>(fd),
+				reinterpret_cast<__sc_word_t>(path), paddr,
+				static_cast<__sc_word_t>(flags));
+	} else if (fsfdt == mlibc::fsfd_target::fd) {
+		ret = syscall(SYS_FSTAT, static_cast<__sc_word_t>(fd), paddr);
+	} else {
+		ret = syscall(SYS_STAT, reinterpret_cast<__sc_word_t>(path), paddr);
+	}
 	if (int e = sc_error(ret))
 		return e;
 

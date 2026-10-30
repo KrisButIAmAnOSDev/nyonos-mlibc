@@ -18,6 +18,7 @@
 #include <sys/uio.h>
 #include <sys/times.h>
 #include <sys/resource.h>
+#include <sys/utsname.h>
 #include <sched.h>
 #include <unistd.h>
 
@@ -238,25 +239,32 @@ int Sysdeps<FutexWake>::operator()(int *pointer, bool all) {
 }
 
 int Sysdeps<GetPgid>::operator()(pid_t pid, pid_t *pgid) {
-	(void)pid;
-	*pgid = static_cast<pid_t>(syscall(SYS_GETPID));
+	auto ret = syscall(SYS_GETPGID, static_cast<__sc_word_t>(pid));
+	if (int e = sc_error(ret))
+		return e;
+	*pgid = static_cast<pid_t>(ret);
 	return 0;
 }
 
 int Sysdeps<GetSid>::operator()(pid_t pid, pid_t *sid) {
-	(void)pid;
-	*sid = static_cast<pid_t>(syscall(SYS_GETPID));
+	pid_t pgid = 0;
+	if (int e = Sysdeps<GetPgid>{}(pid, &pgid))
+		return e;
+	*sid = pgid;
 	return 0;
 }
 
 int Sysdeps<SetPgid>::operator()(pid_t pid, pid_t pgid) {
-	(void)pid;
-	(void)pgid;
-	return 0;
+	auto ret = syscall(SYS_SETPGID, static_cast<__sc_word_t>(pid),
+			static_cast<__sc_word_t>(pgid));
+	return sc_error(ret);
 }
 
 int Sysdeps<SetSid>::operator()(pid_t *sid) {
-	*sid = static_cast<pid_t>(syscall(SYS_GETPID));
+	auto ret = syscall(SYS_SETSID);
+	if (int e = sc_error(ret))
+		return e;
+	*sid = static_cast<pid_t>(ret);
 	return 0;
 }
 
@@ -424,6 +432,18 @@ int Sysdeps<GetHostname>::operator()(char *name, size_t len) {
 	                    static_cast<__sc_word_t>(len));
 	if (sc_error(ret))
 		return sc_error(ret);
+	return 0;
+}
+
+int Sysdeps<Uname>::operator()(struct utsname *buf) {
+	if (!buf)
+		return EINVAL;
+	memset(buf, 0, sizeof(*buf));
+	strncpy(buf->sysname, "nyonOS", sizeof(buf->sysname) - 1);
+	strncpy(buf->nodename, "nyon", sizeof(buf->nodename) - 1);
+	strncpy(buf->release, "0.1", sizeof(buf->release) - 1);
+	strncpy(buf->version, "nyonOS", sizeof(buf->version) - 1);
+	strncpy(buf->machine, "x86_64", sizeof(buf->machine) - 1);
 	return 0;
 }
 

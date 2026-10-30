@@ -71,6 +71,9 @@
 #define SYS_CHMOD 72
 #define SYS_FCHMOD 73
 #define SYS_UTIMES 74
+#define SYS_SETSID 75
+#define SYS_GETPGID 76
+#define SYS_SETPGID 77
 
 #define ABI_WNOHANG 1
 #define ABI_AT_FDCWD -100

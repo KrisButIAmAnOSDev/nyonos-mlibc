@@ -104,6 +104,7 @@ struct NyonosSysdepTags :
 	Truncate,
 	Ttyname,
 	Umask,
+	Uname,
 	Utimensat,
 	VmMap,
 	VmProtect,

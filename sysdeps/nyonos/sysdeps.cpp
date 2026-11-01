@@ -371,6 +371,27 @@ int Sysdeps<Tcsetwinsize>::operator()(int fd, const struct winsize *winsz) {
 	return 0;
 }
 
+int Sysdeps<Tcflow>::operator()(int fd, int action) {
+	auto ret = syscall(SYS_IOCTL, static_cast<__sc_word_t>(fd),
+	                    static_cast<__sc_word_t>(0x540AUL),
+	                    static_cast<__sc_word_t>(action));
+	return sc_error(ret);
+}
+
+int Sysdeps<Tcflush>::operator()(int fd, int queue_selector) {
+	auto ret = syscall(SYS_IOCTL, static_cast<__sc_word_t>(fd),
+	                    static_cast<__sc_word_t>(0x540BUL),
+	                    static_cast<__sc_word_t>(queue_selector));
+	return sc_error(ret);
+}
+
+int Sysdeps<Tcdrain>::operator()(int fd) {
+	auto ret = syscall(SYS_IOCTL, static_cast<__sc_word_t>(fd),
+	                    static_cast<__sc_word_t>(0x540BUL),
+	                    static_cast<__sc_word_t>(1));
+	return sc_error(ret);
+}
+
 int Sysdeps<Ttyname>::operator()(int fd, char *buf, size_t size) {
 	auto ret = syscall(SYS_TTYNAME, static_cast<__sc_word_t>(fd),
 	                    reinterpret_cast<__sc_word_t>(buf),

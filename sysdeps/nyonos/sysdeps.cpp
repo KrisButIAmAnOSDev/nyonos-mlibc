@@ -14,6 +14,7 @@
 #include <mlibc/tcb.hpp>
 
 #include <time.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/uio.h>
 #include <sys/times.h>
@@ -272,28 +273,109 @@ static const uint16_t NYO_POLLIN  = 0x001;
 static const uint16_t NYO_POLLOUT = 0x004;
 static const uint16_t NYO_POLLNVAL = 0x020;
 
+int Sysdeps<ThreadSigmask>::operator()(int how, const sigset_t *__restrict set,
+		sigset_t *__restrict retrieve) {
+	return Sysdeps<Sigprocmask>{}(how, set, retrieve);
+}
+
+int Sysdeps<Sigsuspend>::operator()(const sigset_t *set) {
+	if (!set)
+		return EINVAL;
+	sigset_t oldmask;
+	if (int e = Sysdeps<Sigprocmask>{}(SIG_SETMASK, set, &oldmask))
+		return e;
+	for (;;) {
+		auto ret = syscall(SYS_SLEEP, static_cast<__sc_word_t>(60000));
+		int e = sc_error(ret);
+		if (e == EINTR)
+			break;
+		if (e) {
+			Sysdeps<Sigprocmask>{}(SIG_SETMASK, &oldmask, nullptr);
+			return e;
+		}
+	}
+	int restore = Sysdeps<Sigprocmask>{}(SIG_SETMASK, &oldmask, nullptr);
+	return restore ? restore : EINTR;
+}
+
+static constexpr uint16_t NYO_POLLPRI = 0x002;
+
+static int poll_mask_supported(const sigset_t *mask) {
+	if (!mask)
+		return 0;
+	for (size_t i = 1; i < sizeof(mask->__sig) / sizeof(mask->__sig[0]); i++)
+		if (mask->__sig[i])
+			return EINVAL;
+	return 0;
+}
+
 int Sysdeps<Poll>::operator()(struct pollfd *fds, nfds_t count, int timeout,
                               int *num_events) {
 	auto ret = syscall(SYS_POLL, reinterpret_cast<__sc_word_t>(fds),
-	                    static_cast<__sc_word_t>(count),
-	                    static_cast<__sc_word_t>(timeout),
-	                    reinterpret_cast<__sc_word_t>(num_events));
+                    static_cast<__sc_word_t>(count),
+                    static_cast<__sc_word_t>(timeout),
+                    reinterpret_cast<__sc_word_t>(num_events));
 	if (sc_error(ret))
 		return sc_error(ret);
 	return static_cast<int>(ret);
 }
 
+int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t count,
+                               const struct timespec *timeout,
+                               const sigset_t *sigmask, int *num_events) {
+	if (int e = poll_mask_supported(sigmask))
+		return e;
+	if (count > 1024)
+		return EINVAL;
+
+	int64_t remaining = -1;
+	if (timeout) {
+		if (timeout->tv_sec < 0 || timeout->tv_nsec < 0 || timeout->tv_nsec >= 1000000000L)
+			return EINVAL;
+		if (timeout->tv_sec > (INT64_MAX - 999999) / 1000)
+			return ERANGE;
+		remaining = timeout->tv_sec * 1000
+		          + (timeout->tv_nsec + 999999) / 1000000;
+	}
+
+	sigset_t oldmask;
+	bool restore = sigmask != nullptr;
+	if (restore) {
+		int e = Sysdeps<Sigprocmask>{}(SIG_SETMASK, sigmask, &oldmask);
+		if (e)
+			return e;
+	}
+
+	int result = 0;
+	for (;;) {
+		__sc_word_t chunk = remaining < 0 ? -1 : (remaining > 60000 ? 60000 : remaining);
+		auto ret = syscall(SYS_POLL, reinterpret_cast<__sc_word_t>(fds),
+		                   static_cast<__sc_word_t>(count), chunk,
+		                   reinterpret_cast<__sc_word_t>(num_events));
+
+		int e = sc_error(ret);
+		if (e) {
+			result = e;
+			break;
+		}
+		if (ret > 0 || chunk == 0 || remaining < 0)
+			break;
+		if (remaining <= 60000)
+			break;
+		remaining -= 60000;
+	}
+
+	if (restore) {
+		int e = Sysdeps<Sigprocmask>{}(SIG_SETMASK, &oldmask, nullptr);
+		if (e && !result)
+			result = e;
+	}
+	return result;
+}
+
 int Sysdeps<Pselect>::operator()(int num_fds, fd_set *read_set, fd_set *write_set,
                                  fd_set *except_set, const struct timespec *timeout,
                                  const sigset_t *sigmask, int *num_events) {
-	(void)sigmask;
-
-	int64_t timeout_ms = -1;
-	if (timeout) {
-		timeout_ms = static_cast<int64_t>(timeout->tv_sec) * 1000
-		           + timeout->tv_nsec / 1000000;
-	}
-
 	if (num_fds > 1024)
 		num_fds = 1024;
 
@@ -308,29 +390,30 @@ int Sysdeps<Pselect>::operator()(int num_fds, fd_set *read_set, fd_set *write_se
 			pfds[i].events |= NYO_POLLIN;
 		if (write_set && FD_ISSET(i, write_set))
 			pfds[i].events |= NYO_POLLOUT;
+		if (except_set && FD_ISSET(i, except_set))
+			pfds[i].events |= NYO_POLLPRI;
 	}
 
 	int ready = 0;
-	auto ret = syscall(SYS_POLL, reinterpret_cast<__sc_word_t>(pfds),
-	                    static_cast<__sc_word_t>(n),
-	                    static_cast<__sc_word_t>(timeout_ms),
-	                    reinterpret_cast<__sc_word_t>(num_events));
-	if (!sc_error(ret))
-		ready = static_cast<int>(ret);
+	int e = Sysdeps<Ppoll>{}(pfds, n, timeout, sigmask, &ready);
+	if (e)
+		return e;
 
 	if (read_set)
 		FD_ZERO(read_set);
 	if (write_set)
 		FD_ZERO(write_set);
+	if (except_set)
+		FD_ZERO(except_set);
 
 	for (int i = 0; i < n; i++) {
 		uint16_t rev = pfds[i].revents;
-		if (rev & NYO_POLLIN) {
-			if (read_set) FD_SET(i, read_set);
-		}
-		if (rev & NYO_POLLOUT) {
-			if (write_set) FD_SET(i, write_set);
-		}
+		if (read_set && (rev & NYO_POLLIN))
+			FD_SET(i, read_set);
+		if (write_set && (rev & NYO_POLLOUT))
+			FD_SET(i, write_set);
+		if (except_set && (rev & NYO_POLLPRI))
+			FD_SET(i, except_set);
 	}
 
 	if (num_events)
@@ -920,6 +1003,11 @@ int Sysdeps<Pwrite>::operator()(int fd, const void *buf, size_t n, off_t off, ss
 	return 0;
 }
 
+int Sysdeps<Fadvise>::operator()(int fd, off_t offset, off_t length, int advice) {
+	(void)fd; (void)offset; (void)length; (void)advice;
+	return 0;
+}
+
 int Sysdeps<Access>::operator()(const char *path, int mode) {
 	if (mode & ~(F_OK | X_OK | W_OK | R_OK)) return EINVAL;
 
@@ -1101,11 +1189,6 @@ int Sysdeps<Truncate>::operator()(const char *path, off_t length) {
 }
 
 int Sysdeps<Flock>::operator()(int fd, int options) { (void)fd; (void)options; return 0; }
-
-int Sysdeps<Fadvise>::operator()(int fd, off_t offset, off_t length, int advice) {
-	(void)fd; (void)offset; (void)length; (void)advice;
-	return 0;
-}
 
 int Sysdeps<Madvise>::operator()(void *addr, size_t length, int advice) {
 	(void)addr; (void)length; (void)advice;

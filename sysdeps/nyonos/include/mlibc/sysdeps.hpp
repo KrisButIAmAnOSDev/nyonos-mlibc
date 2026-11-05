@@ -38,6 +38,7 @@ struct NyonosSysdepTags :
 	GetPpid,
 	Pipe,
 	Poll,
+	Ppoll,
 	Pselect,
 	GetSid,
 	GetResgid,
@@ -90,6 +91,8 @@ struct NyonosSysdepTags :
 	SetThreadaffinity,
 	Sigaction,
 	Sigprocmask,
+	ThreadSigmask,
+	Sigsuspend,
 	Kill,
 	Readlink,
 	Symlink,
@@ -112,6 +115,9 @@ struct NyonosSysdepTags :
 	VmMap,
 	VmProtect,
 	VmUnmap,
+#if MLIBC_BUILDING_RTLD
+	VmReadahead,
+#endif
 	Waitpid,
 	Write,
 	Writev,

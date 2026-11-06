@@ -30,7 +30,7 @@ struct NyonosDirent {
 	uint32_t cluster;
 	uint32_t attr;
 	uint32_t is_dir;
-	char name[32];
+	char name[256];
 };
 
 static int sc_error(long ret) {
@@ -746,7 +746,7 @@ struct NyonosStat {
 	uint64_t cluster;
 	uint32_t attr;
 	uint32_t is_dir;
-	char name[32];
+	char name[256];
 };
 
 struct NyonosTimespec2 {

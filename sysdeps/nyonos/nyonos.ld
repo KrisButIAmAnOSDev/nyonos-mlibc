@@ -5,6 +5,7 @@ PHDRS
     text   PT_LOAD FILEHDR PHDRS FLAGS(5);
     rodata PT_LOAD FLAGS(4);
     data   PT_LOAD FLAGS(6);
+    tls    PT_TLS FLAGS(4);
 }
 
 SECTIONS
@@ -29,11 +30,11 @@ SECTIONS
 
     .tdata : ALIGN(4096) {
         *(.tdata .tdata.*)
-    } :data
+    } :data :tls
 
-    .tbss : ALIGN(4096) {
+    .tbss (NOLOAD) : ALIGN(4096) {
         *(.tbss .tbss.*)
-    } :data
+    } :data :tls
 
     .bss : ALIGN(4096) {
         *(.bss .bss.*)

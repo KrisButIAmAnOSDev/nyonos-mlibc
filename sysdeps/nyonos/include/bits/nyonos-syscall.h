@@ -74,6 +74,13 @@
 #define SYS_SETSID 75
 #define SYS_GETPGID 76
 #define SYS_SETPGID 77
+#define SYS_RENAME 87
+#define SYS_CHOWN 88
+#define SYS_FCHOWN 89
+#define SYS_STATFS 90
+#define SYS_MMAP_EXT 91
+#define SYS_MSYNC 92
+#define SYS_MREMAP 93
 
 #define ABI_WNOHANG 1
 #define ABI_AT_FDCWD -100
@@ -83,5 +90,8 @@
 #define ABI_MMAP_PROT_WRITE 2
 #define ABI_MMAP_PROT_EXEC 4
 #define ABI_MMAP_ANON 0x20
+#define ABI_MMAP_SHARED 0x01
+#define ABI_MMAP_PRIVATE 0x02
+#define ABI_MMAP_FIXED 0x10
 
 #endif

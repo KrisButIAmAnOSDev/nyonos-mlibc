@@ -6,6 +6,7 @@
 #include <abi-bits/errno.h>
 #include <abi-bits/mode_t.h>
 #include <abi-bits/fcntl.h>
+#include <abi-bits/vm-flags.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -139,6 +140,25 @@ int Sysdeps<Symlink>::operator()(const char *target_path, const char *link_path)
 int Sysdeps<Link>::operator()(const char *old_path, const char *new_path) {
 	auto ret = syscall(SYS_LINK, reinterpret_cast<__sc_word_t>(old_path),
 			reinterpret_cast<__sc_word_t>(new_path));
+	return sc_error(ret);
+}
+
+int Sysdeps<Rename>::operator()(const char *path, const char *new_path) {
+	auto ret = syscall(SYS_RENAME, reinterpret_cast<__sc_word_t>(path),
+			reinterpret_cast<__sc_word_t>(new_path));
+	return sc_error(ret);
+}
+
+int Sysdeps<Fchownat>::operator()(int dirfd, const char *pathname, uid_t owner, gid_t group,
+		int flags) {
+	(void)flags;
+	if (dirfd != AT_FDCWD && (!pathname || pathname[0] == '\0')) {
+		auto ret = syscall(SYS_FCHOWN, dirfd, static_cast<__sc_word_t>(owner),
+				static_cast<__sc_word_t>(group));
+		return sc_error(ret);
+	}
+	auto ret = syscall(SYS_CHOWN, reinterpret_cast<__sc_word_t>(pathname),
+			static_cast<__sc_word_t>(owner), static_cast<__sc_word_t>(group));
 	return sc_error(ret);
 }
 
@@ -545,7 +565,7 @@ int Sysdeps<Uname>::operator()(struct utsname *buf) {
 	memset(buf, 0, sizeof(*buf));
 	strncpy(buf->sysname, "nyonOS", sizeof(buf->sysname) - 1);
 	strncpy(buf->nodename, "nyon", sizeof(buf->nodename) - 1);
-	strncpy(buf->release, "0.1", sizeof(buf->release) - 1);
+	strncpy(buf->release, "26.0", sizeof(buf->release) - 1);
 	strncpy(buf->version, "nyonOS", sizeof(buf->version) - 1);
 	strncpy(buf->machine, "x86_64", sizeof(buf->machine) - 1);
 	return 0;
@@ -728,11 +748,26 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
 	if (prot & PROT_EXEC)
 		kprot |= ABI_MMAP_PROT_EXEC;
 
-	auto ret = syscall(SYS_MMAP, static_cast<__sc_word_t>(size), kprot, ABI_MMAP_ANON);
+	unsigned kflags = (flags & MAP_SHARED) ? ABI_MMAP_SHARED : ABI_MMAP_PRIVATE;
+	if (flags & MAP_FIXED)
+		kflags |= ABI_MMAP_FIXED;
+	bool anon = (flags & MAP_ANONYMOUS) != 0;
+	if (anon)
+		kflags |= ABI_MMAP_ANON;
+
+	auto ret = syscall(SYS_MMAP_EXT, reinterpret_cast<__sc_word_t>(hint),
+			static_cast<__sc_word_t>(size), kprot, kflags,
+			anon ? -1 : fd, static_cast<__sc_word_t>(offset));
 	if (int e = sc_error(ret))
 		return e;
 	*window = reinterpret_cast<void *>(static_cast<__sc_word_t>(ret));
 	return 0;
+}
+
+int Sysdeps<Msync>::operator()(void *addr, size_t length, int flags) {
+	auto ret = syscall(SYS_MSYNC, reinterpret_cast<__sc_word_t>(addr),
+			static_cast<__sc_word_t>(length), static_cast<__sc_word_t>(flags));
+	return sc_error(ret);
 }
 
 int Sysdeps<VmUnmap>::operator()(void *pointer, size_t size) {
@@ -746,7 +781,20 @@ struct NyonosStat {
 	uint64_t cluster;
 	uint32_t attr;
 	uint32_t is_dir;
+	uint32_t mode;
+	uint32_t uid;
+	uint32_t gid;
+	uint32_t pad;
 	char name[256];
+};
+
+struct NyonosStatfs {
+	uint64_t total_blocks;
+	uint64_t free_blocks;
+	uint64_t total_inodes;
+	uint64_t free_inodes;
+	uint32_t block_size;
+	uint32_t name_max;
 };
 
 struct NyonosTimespec2 {
@@ -761,12 +809,12 @@ static void fill_linux_stat(struct stat *out, const NyonosStat *in) {
 	out->st_dev = 0;
 	out->st_ino = in->cluster;
 	out->st_nlink = 1;
-	mode_t perm = in->is_dir ? 0755 : 0644;
-	if (in->attr & 0x01)
+	mode_t perm = in->mode ? (in->mode & 07777) : (in->is_dir ? 0755 : 0644);
+	if (!in->mode && (in->attr & 0x01))
 		perm &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
 	out->st_mode = in->is_dir ? S_IFDIR | perm : S_IFREG | perm;
-	out->st_uid = 0;
-	out->st_gid = 0;
+	out->st_uid = in->uid;
+	out->st_gid = in->gid;
 	out->st_rdev = 0;
 	out->st_size = static_cast<off_t>(in->size);
 	out->st_blksize = 512;

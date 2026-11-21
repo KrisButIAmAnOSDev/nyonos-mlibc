@@ -1590,6 +1590,9 @@ uint32_t gnuHash(frg::string_view string) {
 // TODO: move this to some namespace or class?
 frg::optional<ObjectSymbol> resolveInObject(SharedObject *object, frg::string_view string,
 		frg::optional<SymbolVersion> version) {
+	if(object->hashStyle == HashStyle::none)
+		return frg::optional<ObjectSymbol>{};
+
 	// Checks if the symbol can be used to satisfy the dependency.
 	auto eligible = [&] (ObjectSymbol cand) {
 		if(cand.symbol()->st_shndx == SHN_UNDEF)

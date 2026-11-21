@@ -668,7 +668,7 @@ if not headers_only
 		ld_shared_lib = shared_library(ld_library_name, rtld_sources + rtld_dso_sources,
 			name_prefix: '',
 			cpp_args: mlibc_c_args + ld_cpp_args,
-			link_args: mlibc_link_args,
+			link_args: ['-Wl,--hash-style=gnu', mlibc_link_args],
 			include_directories: rtld_include_dirs,
 			dependencies: rtld_deps + rtlib_deps,
 			install: true
@@ -682,7 +682,7 @@ if not headers_only
 			dependencies: libc_deps + rtlib_deps,
 			link_with: [ld_shared_lib],
 			link_whole: libc_sublibs,
-			link_args: ['-Wl,--version-script,' + hide_everything_ld, mlibc_link_args],
+			link_args: ['-Wl,--version-script,' + hide_everything_ld, '-Wl,--enable-new-dtags', '-Wl,--hash-style=gnu', mlibc_link_args],
 			link_depends: [hide_everything_ld],
 			install: true
 		)

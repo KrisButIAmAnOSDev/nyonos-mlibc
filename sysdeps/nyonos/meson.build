@@ -68,6 +68,7 @@ rtld_sources += files(
 	'syscall.cpp',
 	'threading/x86_64-thread.cpp',
 	'threading/x86_64-thread-entry.S',
+	'rtld-generic/support.cpp',
 )
 rtld_include_dirs += include_directories('include')
 

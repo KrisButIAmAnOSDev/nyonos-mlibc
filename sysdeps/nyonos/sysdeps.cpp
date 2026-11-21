@@ -812,7 +812,10 @@ static void fill_linux_stat(struct stat *out, const NyonosStat *in) {
 	mode_t perm = in->mode ? (in->mode & 07777) : (in->is_dir ? 0755 : 0644);
 	if (!in->mode && (in->attr & 0x01))
 		perm &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
-	out->st_mode = in->is_dir ? S_IFDIR | perm : S_IFREG | perm;
+	if (in->pad)
+		out->st_mode = S_IFLNK | perm;
+	else
+		out->st_mode = in->is_dir ? S_IFDIR | perm : S_IFREG | perm;
 	out->st_uid = in->uid;
 	out->st_gid = in->gid;
 	out->st_rdev = 0;
@@ -836,10 +839,13 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 		ret = syscall(SYS_FSTATAT, static_cast<__sc_word_t>(fd),
 				reinterpret_cast<__sc_word_t>(path), paddr,
 				static_cast<__sc_word_t>(flags));
-	} else if (fsfdt == mlibc::fsfd_target::fd) {
+	} else if (fsfdt == mlibc::fsfd_target::fd ||
+			(fsfdt == mlibc::fsfd_target::fd_path && (flags & 0x1000) && fd >= 0)) {
 		ret = syscall(SYS_FSTAT, static_cast<__sc_word_t>(fd), paddr);
-	} else {
+	} else if (path) {
 		ret = syscall(SYS_STAT, reinterpret_cast<__sc_word_t>(path), paddr);
+	} else {
+		return EFAULT;
 	}
 	if (int e = sc_error(ret))
 		return e;
